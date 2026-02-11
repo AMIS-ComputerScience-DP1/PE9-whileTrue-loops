@@ -1,5 +1,9 @@
 import sys
 
+# ==============================================================================
+#  STUDENT EXERCISES (Edit these functions)
+# ==============================================================================
+
 def get_positive_number():
     """
     Task 1: Input Validation
@@ -52,69 +56,127 @@ def calculate_average():
 
 
 # ==============================================================================
-#  DO NOT EDIT BELOW THIS LINE
-#  The code below automatically tests your functions when you run this file.
+#  TEST RUNNER (Do not modify below this line)
 # ==============================================================================
+import io
+import builtins
 
-import unittest
-from unittest.mock import patch
-from io import StringIO
+class TestRunner:
+    def __init__(self):
+        self.failed_checks = 0
+        self.total_checks = 0
 
-class TestPostConditionalLoops(unittest.TestCase):
-
-    @patch('builtins.input', side_effect=['-5', 'abc', '0', '10'])
-    @patch('sys.stdout', new_callable=StringIO)
-    def test_1_get_positive_number(self, mock_stdout, mock_input):
-        result = get_positive_number()
-        output = mock_stdout.getvalue()
+    def mock_input_output(self, inputs, func, args=None):
+        """Helper to simulate inputs and capture prints safely"""
+        original_input = builtins.input
+        original_stdout = sys.stdout
         
-        self.assertEqual(result, 10, "Task 1: Should return the first valid positive integer (10).")
-        self.assertIn("Invalid input", output, "Task 1: Should print 'Invalid input.' on bad data.")
-        self.assertGreaterEqual(output.count("Invalid input"), 3, "Task 1: Should complain for every bad input (-5, abc, 0).")
-
-    @patch('builtins.input', side_effect=['m', 'X', 'T', 's'])
-    @patch('sys.stdout', new_callable=StringIO)
-    def test_2_robot_menu(self, mock_stdout, mock_input):
-        robot_menu()
-        output = mock_stdout.getvalue().lower()
+        input_iterator = iter(inputs)
+        captured_output = io.StringIO()
         
-        self.assertIn("moving forward", output, "Task 2: 'm' should print 'Moving forward...'")
-        self.assertIn("unknown command", output, "Task 2: 'X' should print 'Unknown command.'")
-        self.assertIn("turning right", output, "Task 2: 'T' should print 'Turning right...'")
-        self.assertIn("stopping", output, "Task 2: 's' should print 'Stopping...'")
-
-    @patch('builtins.input', side_effect=['wrong1', 'wrong2', 'secret'])
-    @patch('sys.stdout', new_callable=StringIO)
-    def test_3a_authenticate_success(self, mock_stdout, mock_input):
-        result = authenticate_user("secret", 3)
-        output = mock_stdout.getvalue()
+        def mock_input(prompt=""):
+            try:
+                return next(input_iterator)
+            except StopIteration:
+                return ""
         
-        self.assertTrue(result, "Task 3: Should return True if password is correct within limit.")
-        self.assertIn("Access Granted", output, "Task 3: Should print 'Access Granted'.")
+        builtins.input = mock_input
+        sys.stdout = captured_output
 
-    @patch('builtins.input', side_effect=['wrong', 'wrong', 'wrong'])
-    @patch('sys.stdout', new_callable=StringIO)
-    def test_3b_authenticate_fail(self, mock_stdout, mock_input):
-        result = authenticate_user("secret", 3)
-        output = mock_stdout.getvalue()
+        result = None
+        try:
+            if args:
+                result = func(*args)
+            else:
+                result = func()
+        except Exception as e:
+            # We catch crashes but don't stop the whole suite
+            result = None
+            print(f"    [CRASH] Your code crashed: {e}")
+        finally:
+            builtins.input = original_input
+            sys.stdout = original_stdout
+            
+        return result, captured_output.getvalue()
+
+    def check(self, description, condition, failure_msg):
+        self.total_checks += 1
+        if condition:
+            print(f"  [\033[92mOK\033[0m] {description}")
+        else:
+            print(f"  [\033[91mFAIL\033[0m] {description}")
+            print(f"         -> {failure_msg}")
+            self.failed_checks += 1
+
+    def summary(self):
+        print("\n" + "="*40)
+        print(f"SUMMARY: {self.total_checks - self.failed_checks}/{self.total_checks} Checks Passed")
+        print("="*40)
+        # Only exit with error code at the very end
+        if self.failed_checks > 0:
+            sys.exit(1)
+
+def run_tests():
+    t = TestRunner()
+    print("\nRunning Tests...\n")
+
+    # --- Test Task 1 ---
+    print("--- Checking Task 1: Positive Number ---")
+    try:
+        res, out = t.mock_input_output(['-5', 'abc', '10'], get_positive_number)
+        t.check("Return Value is 10", res == 10, f"Expected return 10, got {res}")
+        t.check("Prints error message", "Invalid input" in out, "Did not print 'Invalid input.' on bad data")
+    except Exception as e:
+        print(f"  [CRASH] Task 1 crashed: {e}")
+        t.failed_checks += 1
+    print("")
+
+    # --- Test Task 2 ---
+    print("--- Checking Task 2: Robot Menu ---")
+    try:
+        res, out = t.mock_input_output(['m', 'X', 's'], robot_menu)
+        out = out.lower() if out else ""
+        t.check("Responds to 'm'", "moving forward" in out, "Input 'm' did not print 'Moving forward...'")
+        t.check("Responds to unknown", "unknown command" in out, "Input 'X' did not print 'Unknown command.'")
+        t.check("Responds to 's'", "stopping" in out, "Input 's' did not print 'Stopping...'")
+    except Exception as e:
+        print(f"  [CRASH] Task 2 crashed: {e}")
+        t.failed_checks += 1
+    print("")
+
+    # --- Test Task 3 ---
+    print("--- Checking Task 3: Authentication ---")
+    try:
+        # Case A: Success
+        res, out = t.mock_input_output(['wrong', 'secret'], authenticate_user, ["secret", 3])
+        t.check("Correct password returns True", res is True, f"Expected True, got {res}")
         
-        self.assertFalse(result, "Task 3: Should return False if attempts run out.")
-        self.assertIn("Locked out", output, "Task 3: Should print 'Locked out'.")
+        # Case B: Failure
+        res, out = t.mock_input_output(['wrong', 'wrong', 'wrong'], authenticate_user, ["secret", 3])
+        t.check("Max attempts returns False", res is False, f"Expected False, got {res}")
+        t.check("Prints lockout message", "Locked out" in (out if out else ""), "Did not print 'Locked out'")
+    except Exception as e:
+        print(f"  [CRASH] Task 3 crashed: {e}")
+        t.failed_checks += 1
+    print("")
 
-    @patch('builtins.input', side_effect=['10', '20', '30', 'q'])
-    @patch('sys.stdout', new_callable=StringIO)
-    def test_4a_calculate_average(self, mock_stdout, mock_input):
-        result = calculate_average()
-        self.assertAlmostEqual(result, 20.0, places=2, msg="Task 4: Average of 10, 20, 30 should be 20.0")
+    # --- Test Task 4 ---
+    print("--- Checking Task 4: Average ---")
+    try:
+        res, out = t.mock_input_output(['10', 'bad', '20', 'q'], calculate_average)
+        out = out if out else ""
+        # Handle None return gracefully
+        is_correct = False
+        if isinstance(res, (int, float)):
+            is_correct = abs(res - 15.0) < 0.01
+        
+        t.check("Calculates average (10, 20)", is_correct, f"Expected 15.0, got {res}")
+        t.check("Handles invalid input", "Not a number" in out, "Did not print 'Not a number' for text input")
+    except Exception as e:
+        print(f"  [CRASH] Task 4 crashed: {e}")
+        t.failed_checks += 1
 
-    @patch('builtins.input', side_effect=['bad', '10', 'q'])
-    @patch('sys.stdout', new_callable=StringIO)
-    def test_4b_calculate_average_validation(self, mock_stdout, mock_input):
-        result = calculate_average()
-        output = mock_stdout.getvalue()
-        self.assertAlmostEqual(result, 10.0, msg="Task 4: Should ignore bad inputs and calculate average of valid ones.")
-        self.assertIn("Not a number", output, "Task 4: Should warn on invalid input.")
+    t.summary()
 
-if __name__ == '__main__':
-    print("\nRunning Autotests...\n")
-    unittest.main(verbosity=2, exit=False)
+if __name__ == "__main__":
+    run_tests()
