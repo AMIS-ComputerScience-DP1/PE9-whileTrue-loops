@@ -1,0 +1,31 @@
+name: Autograding
+
+on: [push]
+
+permissions:
+  checks: write
+  actions: read
+  contents: read
+
+jobs:
+  run-autograding-tests:
+    runs-on: ubuntu-latest
+    if: github.actor != 'github-classroom[bot]'
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+
+    - name: Run PE9exercises
+      id: test
+      run: python PE9exercises.py
+
+    - name: Autograding Reporter
+      uses: education/autograding-grading-reporter@v1
+      if: always()
+      with:
+        runners: test
